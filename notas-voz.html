@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#14161b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Notas de voz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: rápida, de bolsillo, sin ruido
+   IDEA: una grabadora-libreta: botón de grabar grande, hojas debajo
+   PICTURE: el botón rojo de grabar y la tarjeta de captura
+   COLOUR/TYPE: tinta casi negra, rojo de grabación, un amarillo de aviso; Atkinson Hyperlegible
+   LAYOUT: una columna, captura arriba, lista debajo */
+:root{color-scheme:light dark;--bg:light-dark(#f4f4f2,#101216);--card:light-dark(#fff,#1b1e24);--ink:light-dark(#14161b,#eceef2);--mute:light-dark(#61656f,#9aa0ab);--line:light-dark(#e1e2e5,#2b2f37);--rec:#e5383b;--idea:#2f6fdc;--nota:#5b6170;--aviso:#d89b00;--tarea:#1f9d6b}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 "Atkinson Hyperlegible",system-ui,sans-serif;overflow-x:clip}
+main{max-width:680px;margin:0 auto;padding:16px 14px 90px}
+h1{font-size:22px;margin:4px 0 12px;display:flex;justify-content:space-between;align-items:center}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;border-radius:12px;min-height:44px;padding:0 14px;background:var(--line)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--idea);outline-offset:2px}
+.cap{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.recrow{display:flex;align-items:center;gap:14px}
+#rec{width:84px;height:84px;border-radius:50%;background:var(--rec);flex:none;display:grid;place-items:center;box-shadow:0 6px 18px #e5383b55}
+#rec svg{width:34px;height:34px;fill:#fff}
+#rec.on{animation:pulse 1.2s infinite}
+#rec.on svg .mic{display:none}#rec:not(.on) svg .stop{display:none}
+@keyframes pulse{50%{box-shadow:0 0 0 14px #e5383b22}}
+@media (prefers-reduced-motion:reduce){#rec.on{animation:none}}
+#estado{color:var(--mute);font-size:15px}
+textarea{width:100%;min-height:110px;margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);font-size:17px;resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{background:transparent;border:2px solid var(--line);border-radius:999px;min-height:40px;padding:0 14px;font-size:15px}
+.chip[aria-pressed=true]{border-color:var(--c);background:var(--c);color:#fff}
+.acc{display:flex;gap:8px;margin-top:12px}
+.acc .main{flex:1;background:var(--ink);color:var(--bg);font-weight:700}
+.bar{display:flex;gap:8px;margin:18px 0 10px;flex-wrap:wrap}
+.bar input{flex:1 1 180px;min-height:44px;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--card);font-size:16px}
+.filtros{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.filtros .chip{flex:none}
+ul{list-style:none;padding:0;margin:8px 0 0}
+li{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:14px;padding:12px 12px 8px;margin-bottom:10px}
+li.hecha .txt{text-decoration:line-through;color:var(--mute)}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mute)}
+.tipo{color:var(--c);font-weight:700}
+.txt{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 6px}
+.tag{color:var(--idea);font-weight:700}
+.ops{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.ops button{min-height:38px;font-size:14px;background:transparent;border:1px solid var(--line)}
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px;margin-bottom:12px}
+.seg button{flex:1;background:transparent;font-weight:700;color:var(--mute)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.amb{font-size:13px;color:var(--mute)}
+.vacio{text-align:center;color:var(--mute);padding:30px 10px}
+.mas{margin-top:24px;display:flex;flex-wrap:wrap;gap:8px}
+.mas button{font-size:15px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 14px;display:none;gap:12px;align-items:center;font-size:15px;max-width:92vw}
+#toast button{min-height:34px;background:transparent;color:var(--rec);font-weight:700}
+.aviso-sm{font-size:14px;color:var(--mute);margin-top:8px}
+</style>
+</head>
+<body>
+<main>
+<h1>Notas de voz <span id="cuenta" style="font-size:14px;color:var(--mute);font-weight:400"></span></h1>
+
+<div class="seg" id="ambitoF"></div>
+
+<section class="cap">
+  <div class="recrow">
+    <button id="rec" aria-label="Grabar">
+      <svg viewBox="0 0 24 24"><path class="mic" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/><rect class="stop" x="6" y="6" width="12" height="12" rx="2"/></svg>
+    </button>
+    <div id="estado">Pulsa para dictar. También puedes escribir o usar el micrófono del teclado.</div>
+  </div>
+  <textarea id="texto" placeholder="Lo que digas aparecerá aquí… Usa #etiquetas para agrupar ideas"></textarea>
+  <div class="chips" id="ambitos"></div>
+  <div class="chips" id="tipos"></div>
+  <div class="acc">
+    <button id="limpiar">Borrar</button>
+    <button class="main" id="guardar">Guardar nota</button>
+  </div>
+</section>
+
+<div class="bar"><input id="buscar" type="search" placeholder="Buscar texto o #etiqueta"></div>
+<div class="filtros" id="filtros"></div>
+<ul id="lista"></ul>
+
+<div class="mas">
+  <button id="copiar">Copiar lo que se ve (para Claude)</button>
+  <button id="compartir">Compartir</button>
+  <button id="exportar">Copia de seguridad</button>
+  <button id="importarBtn">Restaurar</button>
+  <input id="importar" type="file" accept="application/json" hidden>
+</div>
+<p class="aviso-sm">Las notas se guardan solo en este móvil y en este navegador. Haz de vez en cuando una copia de seguridad.</p>
+</main>
+<div id="toast"><span id="tmsg"></span><button id="tbtn">Deshacer</button></div>
+
+<script>
+{
+const TIPOS=[['idea','Idea'],['nota','Nota'],['aviso','Aviso'],['tarea','Tarea']];
+const KEY='notasVoz.v1';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let notas=[];try{notas=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
+const AMB=[['personal','Personal'],['trabajo','Trabajo']];
+const lsGet=(k,d)=>{try{return localStorage.getItem(KEY+'.'+k)||d}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(KEY+'.'+k,v)}catch(e){}};
+let ambSel=lsGet('amb','personal'),ambF=lsGet('ambF','todo');
+let tipoSel='idea',filtro='todas',editId=null,undo=null,tt;
+const guardarLS=()=>{try{localStorage.setItem(KEY,JSON.stringify(notas))}catch(e){toast('No se pudo guardar en el móvil')}};
+const color=t=>`var(--${t})`;
+
+function chipsTipo(){
+  $('tipos').innerHTML=TIPOS.map(([k,n])=>`<button class="chip" style="--c:${color(k)}" aria-pressed="${k===tipoSel}" data-t="${k}">${n}</button>`).join('');
+}
+function chipsAmb(){
+  $('ambitos').innerHTML=AMB.map(([k,n])=>`<button class="chip" style="--c:var(--ink)" aria-pressed="${k===ambSel}" data-m="${k}">${n}</button>`).join('');
+  $('ambitoF').innerHTML=[...AMB,['todo','Todo']].map(([k,n])=>`<button aria-pressed="${k===ambF}" data-g="${k}">${n}</button>`).join('');
+}
+function chipsFiltro(){
+  const opts=[['todas','Todas'],...TIPOS,['pend','Pendientes']];
+  $('filtros').innerHTML=opts.map(([k,n])=>`<button class="chip" style="--c:${k==='todas'||k==='pend'?'var(--ink)':color(k)}" aria-pressed="${k===filtro}" data-f="${k}">${n}</button>`).join('');
+}
+function visibles(){
+  const q=$('buscar').value.trim().toLowerCase();
+  return notas.filter(n=>(ambF==='todo'||(n.ambito||'personal')===ambF)&&(filtro==='todas'||n.tipo===filtro||(filtro==='pend'&&(n.tipo==='aviso'||n.tipo==='tarea')&&!n.hecha))&&(!q||n.texto.toLowerCase().includes(q)));
+}
+function fecha(ts){const d=new Date(ts);return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}
+function pintar(){
+  const v=visibles();
+  $('cuenta').textContent=notas.length?notas.length+(notas.length===1?' nota':' notas'):'';
+  if(!v.length){$('lista').innerHTML=`<li class="vacio" style="--c:transparent">${notas.length?'Nada coincide con el filtro.':'Aún no hay notas. Pulsa el botón rojo y habla.'}</li>`;return}
+  $('lista').innerHTML=v.map(n=>{
+    const nombre=TIPOS.find(t=>t[0]===n.tipo)[1];
+    const txt=esc(n.texto).replace(/(^|\s)(#[\wáéíóúñü-]+)/gi,'$1<span class="tag">$2</span>');
+    const check=(n.tipo==='aviso'||n.tipo==='tarea')?`<button data-a="hecha" data-id="${n.id}">${n.hecha?'Reabrir':'Hecho'}</button>`:'';
+    return `<li class="${n.hecha?'hecha':''}" style="--c:${color(n.tipo)}"><div class="meta"><span><span class="tipo">${nombre}</span> <span class="amb">· ${n.ambito==='trabajo'?'Trabajo':'Personal'}</span></span><span>${fecha(n.ts)}</span></div><div class="txt">${txt}</div><div class="ops">${check}<button data-a="editar" data-id="${n.id}">Editar</button><button data-a="borrar" data-id="${n.id}">Borrar</button></div></li>`;
+  }).join('');
+}
+function toast(msg,fn){
+  $('tmsg').textContent=msg;$('tbtn').style.display=fn?'':'none';undo=fn||null;
+  $('toast').style.display='flex';clearTimeout(tt);tt=setTimeout(()=>{$('toast').style.display='none';undo=null},5000);
+}
+$('tbtn').onclick=()=>{if(undo)undo();$('toast').style.display='none'};
+
+$('ambitos').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;ambSel=b.dataset.m;lsSet('amb',ambSel);chipsAmb()};
+$('ambitoF').onclick=e=>{const b=e.target.closest('[data-g]');if(!b)return;ambF=b.dataset.g;lsSet('ambF',ambF);if(ambF!=='todo'){ambSel=ambF;lsSet('amb',ambSel)}chipsAmb();pintar()};
+$('tipos').onclick=e=>{const b=e.target.closest('[data-t]');if(!b)return;tipoSel=b.dataset.t;chipsTipo()};
+$('filtros').onclick=e=>{const b=e.target.closest('[data-f]');if(!b)return;filtro=b.dataset.f;chipsFiltro();pintar()};
+$('buscar').oninput=pintar;
+
+$('guardar').onclick=()=>{
+  pararRec();
+  const t=$('texto').value.trim();if(!t){toast('No hay nada que guardar');return}
+  if(editId){const n=notas.find(x=>x.id===editId);if(n){n.texto=t;n.tipo=tipoSel;n.ambito=ambSel}editId=null;$('guardar').textContent='Guardar nota';toast('Nota actualizada')}
+  else{notas.unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),texto:t,tipo:tipoSel,ambito:ambSel,ts:Date.now(),hecha:false});toast('Guardada')}
+  $('texto').value='';base='';guardarLS();pintar();
+  try{localStorage.removeItem(KEY+'.borrador')}catch(e){}
+};
+$('limpiar').onclick=()=>{pararRec();$('texto').value='';base='';editId=null;$('guardar').textContent='Guardar nota'};
+$('texto').oninput=()=>{try{localStorage.setItem(KEY+'.borrador',$('texto').value)}catch(e){}};
+try{$('texto').value=localStorage.getItem(KEY+'.borrador')||''}catch(e){}
+
+$('lista').onclick=e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const i=notas.findIndex(n=>n.id===b.dataset.id);if(i<0)return;const n=notas[i];
+  if(b.dataset.a==='hecha'){n.hecha=!n.hecha}
+  else if(b.dataset.a==='editar'){editId=n.id;tipoSel=n.tipo;ambSel=n.ambito||'personal';chipsTipo();chipsAmb();$('texto').value=n.texto;$('guardar').textContent='Guardar cambios';window.scrollTo({top:0,behavior:'smooth'});$('texto').focus();return}
+  else if(b.dataset.a==='borrar'){notas.splice(i,1);toast('Nota borrada',()=>{notas.splice(i,0,n);guardarLS();pintar()})}
+  guardarLS();pintar();
+};
+
+function textoExport(){
+  const v=visibles();
+  return v.map(n=>`- [${n.ambito==='trabajo'?'Trabajo':'Personal'} · ${TIPOS.find(t=>t[0]===n.tipo)[1]}${n.hecha?', hecha':''}] (${fecha(n.ts)}) ${n.texto}`).join('\n');
+}
+$('copiar').onclick=async()=>{
+  const t=textoExport();if(!t){toast('No hay notas visibles');return}
+  try{await navigator.clipboard.writeText('Mis notas:\n'+t);toast('Copiadas. Pégalas en el chat con Claude')}catch(e){toast('No se pudo copiar')}
+};
+$('compartir').onclick=async()=>{
+  const t=textoExport();if(!t){toast('No hay notas visibles');return}
+  if(navigator.share){try{await navigator.share({title:'Mis notas',text:t})}catch(e){}}else{toast('Este navegador no permite compartir; usa Copiar')}
+};
+$('exportar').onclick=()=>{
+  const blob=new Blob([JSON.stringify(notas,null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='notas-voz-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+};
+$('importarBtn').onclick=()=>$('importar').click();
+$('importar').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const data=JSON.parse(await f.text());if(!Array.isArray(data))throw 0;
+    const ids=new Set(notas.map(n=>n.id));let k=0;
+    for(const n of data){if(n&&n.id&&typeof n.texto==='string'&&!ids.has(n.id)){notas.push({id:String(n.id),texto:n.texto,tipo:TIPOS.some(t=>t[0]===n.tipo)?n.tipo:'nota',ambito:n.ambito==='trabajo'?'trabajo':'personal',ts:+n.ts||Date.now(),hecha:!!n.hecha});k++}}
+    notas.sort((a,b)=>b.ts-a.ts);guardarLS();pintar();toast(k+' notas restauradas');
+  }catch(err){toast('Ese archivo no es una copia válida')}
+  e.target.value='';
+};
+
+/* Dictado: frases cortas y reinicio automático (más fiable en Chrome Android) */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,grabando=false,base='';
+function pararRec(){if(grabando){grabando=false;try{rec.stop()}catch(e){}}$('rec').classList.remove('on');$('rec').setAttribute('aria-label','Grabar')}
+function arrancar(){
+  rec=new SR();rec.lang='es-ES';rec.interimResults=true;rec.continuous=false;
+  rec.onresult=e=>{
+    let fin='',tmp='';
+    for(const r of e.results){if(r.isFinal)fin+=r[0].transcript;else tmp+=r[0].transcript}
+    if(fin){base=(base?base.replace(/\s+$/,'')+' ':'')+fin.trim();$('texto').value=base}
+    else $('texto').value=(base?base+' ':'')+tmp;
+  };
+  rec.onerror=e=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){grabando=false;pararRec();$('estado').textContent='Sin permiso de micrófono. Actívalo en los ajustes del navegador.'}
+    else if(e.error==='network'){grabando=false;pararRec();$('estado').textContent='El dictado necesita internet. Prueba el micrófono del teclado.'}
+  };
+  rec.onend=()=>{if(grabando){try{rec.start()}catch(e){}}else{$('texto').value=base;$('estado').textContent='Listo. Revisa el texto, elige el tipo y guarda.'}};
+  rec.start();
+}
+$('rec').onclick=()=>{
+  if(!SR){$('estado').textContent='Este navegador no tiene dictado. Toca el cuadro de texto y usa el micrófono del teclado.';$('texto').focus();return}
+  if(grabando){pararRec();return}
+  base=$('texto').value.trim();grabando=true;
+  $('rec').classList.add('on');$('rec').setAttribute('aria-label','Parar');
+  $('estado').textContent='Escuchando… pulsa otra vez para parar.';
+  try{arrancar()}catch(e){pararRec();$('estado').textContent='No se pudo iniciar el dictado.'}
+};
+
+chipsAmb();chipsTipo();chipsFiltro();pintar();
+}
+</script>
+</body>
+</html>
